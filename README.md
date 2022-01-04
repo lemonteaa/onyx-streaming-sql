@@ -6,7 +6,7 @@ This is a [Clojure](https://clojure.org/) template configured for ephemeral deve
 
 Click the button below to start a new development environment:
 
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/gitpod-io/template-clojure)
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/lemonteaa/onyx-streaming-sql)
 
 ## Get Started With Your Own Project
 
