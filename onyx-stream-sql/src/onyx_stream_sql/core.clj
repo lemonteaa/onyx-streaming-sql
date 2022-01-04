@@ -29,7 +29,8 @@
      (api/env-summary)))
 
 (defn add-segment [input-name env segment]
-  (api/new-segment env input-name segment))
+  (api/new-segment env input-name {:src input-name
+                                   :data segment}))
 
 (defn runtest [job input-name segments]
   (let [env (api/init job)
@@ -51,6 +52,13 @@
    :from [:person :b]
    :where [:age-large]})
 
+(def test2
+  {:select [:b/age :b/name :c/country-name]
+   :from [:person :b]
+   :join {:target [:country :c]
+          :on-key [:c/country-code :b/country]}
+   :where [:age-large]})
+
 (defn gen-input [name]
   {:onyx/name name
    :onyx/type :input
@@ -63,20 +71,30 @@
 
 (defn run-process [sql segment]
   (let [ks (map #(keyword (name %)) (:select sql))]
-    (select-keys segment ks)))
+    (select-keys (:data segment) ks)))
 
 (defn compile-query [sql]
   (let [input-name (first (:from sql))
-        output-name :out]
-    {:workflow [[input-name :proc] [:proc output-name]]
-     :catalog [(gen-input input-name)
-               {:onyx/name :proc
-                :onyx/type :function
-                :onyx/fn ::run-process
-                :streamql/sql sql
-                :onyx/params [:streamql/sql]
-                :onyx/batch-size 20}
-               (gen-output output-name)]
+        output-name :out
+        has-join? (contains? sql :join)
+        join-name (if has-join? 
+                    (-> sql
+                        (get-in [:join :target])
+                        (first)))]
+    {:workflow (cond-> []
+                 true (conj [input-name :proc])
+                 has-join? (conj [join-name :proc])
+                 true (conj [:proc output-name]))
+     :catalog (cond-> []
+                true (conj (gen-input input-name))
+                has-join? (conj (gen-input join-name))
+                true (conj {:onyx/name :proc
+                            :onyx/type :function
+                            :onyx/fn ::run-process
+                            :streamql/sql sql
+                            :onyx/params [:streamql/sql]
+                            :onyx/batch-size 20})
+                true (conj (gen-output output-name)))
      :lifecycles []}))
 
 (runtest
