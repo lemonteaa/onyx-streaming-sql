@@ -70,18 +70,21 @@
    :onyx/batch-size 1})
 
 (defn sum-init-fn [window]
-  0)
+  {:src-hash {}
+   :dst-hash {}})
 
 (defn sum-aggregation-fn [window segment]
   (do 
     (if (= (:src segment) :person)
-      (let [k (-> segment :data :age)]
-        {:value k})
-      {:value 0})))
+      (let [k (-> segment :data :country)]
+        {:value k :loc :src-hash :segment segment})
+      (let [k (-> segment :data :country-code)]
+        {:value k :loc :dst-hash :segment segment}))))
 
 ;; Now just pull out the value and add it to the previous state
 (defn sum-application-fn [window state value]
-  (+ state (:value value)))
+  (update-in state [(:loc value) (:value value)]
+             (constantly (:segment value))))
 
 
 ;; sum aggregation referenced in the window definition.
@@ -95,11 +98,36 @@
 
 (defn dump-window! [event window trigger x state]
   (if (= (:event-type x) :new-segment)
-    (pp/pprint (:segment x))))
+    (let [segment (:segment x)
+          src (:src segment)
+          data (:data segment)
+          lookup-dst (get-in state [:dst-hash (:country data) :data] false)
+          lookup-src (get-in state [:src-hash (:country-code data) :data] false)]
+      (cond (and (= src :person) lookup-dst)
+        {:person data :country lookup-dst}
+            (and (= src :country) lookup-src)
+        {:person lookup-src :country data}))))
+
+(defn rev [[a b]]
+  [b a])
+(defn grab-alias [sql]
+  (->> [(:from sql)
+        (get-in sql [:join :target])]
+       (map rev)
+       (into {})))
+
+;(defn run-process [sql segment]
+;  (let [ks (map #(keyword (name %)) (:select sql))]
+;    (select-keys (:data segment) ks)))
 
 (defn run-process [sql segment]
-  (let [ks (map #(keyword (name %)) (:select sql))]
-    (select-keys (:data segment) ks)))
+  (let [alias (grab-alias sql)
+        ks (:select sql)]
+    (into {} (for [k ks
+                   :let [k-ns (keyword (namespace k))
+                         k-n (keyword (name k))
+                         entity (get alias k-ns)]]
+               [k (get-in segment [entity k-n])]))))
 
 (defn compile-query [sql]
   (let [input-name (first (:from sql))
