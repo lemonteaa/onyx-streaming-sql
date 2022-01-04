@@ -6,6 +6,8 @@ An experiment to implement a StreamingSQL -> Onyx Job compiler.
 
 [Blog post on various techniques and algorithms](https://highlyscalable.wordpress.com/2013/08/20/in-stream-big-data-processing/)
 
+(Spark probable did this comprehensively already - we are just playing catching up)
+
 ## Idea
 
 StreamingSQL is just like SQL, except that relations are now in streaming mode, and some additional features are supported:
@@ -18,6 +20,9 @@ StreamingSQL is just like SQL, except that relations are now in streaming mode, 
 - Symmetric hash join for stream join
 - Sketches and probabilisitic data structure for efficiently updating aggregate stats over a sliding window
 - Convert nondeterministic FSM into a deterministic one for CEP
+
+## What's currently in the repo
+- A WIP for the symmetric hash join
 
 ## Code on Gitpod
 
