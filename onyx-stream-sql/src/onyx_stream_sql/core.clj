@@ -28,13 +28,13 @@
      (api/stop)
      (api/env-summary)))
 
-(defn add-segment [input-name env segment]
+(defn add-segment [env [input-name segment]]
   (api/new-segment env input-name {:src input-name
                                    :data segment}))
 
-(defn runtest [job input-name segments]
+(defn runtest [job segments]
   (let [env (api/init job)
-        nextenv (reduce (partial add-segment input-name)
+        nextenv (reduce add-segment
                         env segments)]
     (-> nextenv
         (api/drain)
@@ -99,8 +99,7 @@
 
 (runtest
  (compile-query test1)
- :person
- [{:age 34 :name "Mary" :other true :test 123}
-  {:age 67 :name "Peter" :other false :test 0}
-  {:age 21 :name "Hackle" :other true}
-  {:age 18 :name "Oliver" :other false :foo :bar}])
+ [[:person {:age 34 :name "Mary" :other true :test 123}]
+  [:person {:age 67 :name "Peter" :other false :test 0}]
+  [:person {:age 21 :name "Hackle" :other true}]
+  [:person {:age 18 :name "Oliver" :other false :foo :bar}]])
