@@ -62,21 +62,22 @@
 (defn gen-input [name]
   {:onyx/name name
    :onyx/type :input
-   :onyx/batch-size 20})
+   :onyx/batch-size 1})
 
 (defn gen-output [name]
   {:onyx/name name
    :onyx/type :output
-   :onyx/batch-size 20})
+   :onyx/batch-size 1})
 
 (defn sum-init-fn [window]
   0)
 
 (defn sum-aggregation-fn [window segment]
-  (if (= (:src segment) :person)
-    (let [k (-> segment :data :age)]
-      {:value k})
-    {:value 0}))
+  (do 
+    (if (= (:src segment) :person)
+      (let [k (-> segment :data :age)]
+        {:value k})
+      {:value 0})))
 
 ;; Now just pull out the value and add it to the previous state
 (defn sum-application-fn [window state value]
@@ -89,8 +90,12 @@
    :aggregation/create-state-update sum-aggregation-fn
    :aggregation/apply-state-update sum-application-fn})
 
+;;(defn dump-window! [event window trigger x state]
+;;  (doall (map pp/pprint [event window trigger x state])))
+
 (defn dump-window! [event window trigger x state]
-  (doall (map pp/pprint [event window trigger x state])))
+  (if (= (:event-type x) :new-segment)
+    (pp/pprint (:segment x))))
 
 (defn run-process [sql segment]
   (let [ks (map #(keyword (name %)) (:select sql))]
@@ -105,22 +110,27 @@
                         (get-in [:join :target])
                         (first)))]
     {:workflow (cond-> []
-                 true (conj [input-name :proc])
-                 has-join? (conj [join-name :proc])
+                 true (conj [input-name (if has-join? :join :proc)])
+                 has-join? (conj [join-name :join])
+                 has-join? (conj [:join :proc])
                  true (conj [:proc output-name]))
      :catalog (cond-> []
                 true (conj (gen-input input-name))
                 has-join? (conj (gen-input join-name))
+                has-join? (conj {:onyx/name :join
+                                 :onyx/type :function
+                                 :onyx/fn :clojure.core/identity
+                                 :onyx/batch-size 1})
                 true (conj {:onyx/name :proc
                             :onyx/type :function
                             :onyx/fn ::run-process
                             :streamql/sql sql
                             :onyx/params [:streamql/sql]
-                            :onyx/batch-size 20})
+                            :onyx/batch-size 1})
                 true (conj (gen-output output-name)))
      :lifecycles []
      :windows [{:window/id :collect-segments
-                :window/task :proc
+                :window/task :join
                 :window/type :global
                 :window/aggregation ::sum}]
      :triggers [{:trigger/window-id :collect-segments
